@@ -1,0 +1,16 @@
+视频链接:
+链接：https://pan.baidu.com/s/1VjYfAf6ESoDex1jswt6dwg?pwd=m8sc 
+提取码：m8sc 
+1. 使用教程说明 2.替换主干和自带的改进说明 3.需要自行修改模块的说明 4.转换划分数据集-训练-测试-推理 5.关于BIFPN的说明
+
+链接：https://pan.baidu.com/s/1M2zDRJQqxxsu5ukXSqi_IA?pwd=q3zz 
+提取码：q3zz 
+1. 如何进行断点续训
+
+链接：https://pan.baidu.com/s/1VrhtnE9-ArDqvDPb_DtLtg?pwd=ikx6 
+提取码：ikx6 
+1. 计算COCO指标教程
+
+链接：https://pan.baidu.com/s/1jYKi__nzatrJdo_9Hyy7NQ?pwd=ppjy 
+提取码：ppjy 
+1.如何在yaml配置文件中添加注意力层

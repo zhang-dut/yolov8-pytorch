@@ -1,0 +1,56 @@
+python train.py --yaml ultralytics/models/v8/yolov8-timm.yaml --info
+python train.py --yaml ultralytics/models/v8/yolov8-dyhead.yaml --info
+python train.py --yaml ultralytics/models/v8/yolov8-act.yaml --info
+python train.py --yaml ultralytics/models/v8/yolov8-EfficientFormerV2.yaml --info
+python train.py --yaml ultralytics/models/v8/yolov8-C2f-ODConv.yaml --info
+
+python train.py --yaml ultralytics/models/v8/yolov8.yaml --info
+python train.py --yaml ultralytics/models/v8/yolov8-slimneck.yaml --info
+python train.py --yaml ultralytics/models/v8/yolov8-bifpn.yaml --info
+python train.py --yaml ultralytics/models/v8/yolov8-C2f-DBB.yaml --info
+python train.py --yaml ultralytics/models/v8/yolov8-p2.yaml --info
+
+python train.py --yaml ultralytics/models/v5/yolov5n.yaml --info
+python train.py --yaml ultralytics/models/v5/yolov5n-dyhead.yaml --info
+python train.py --yaml ultralytics/models/v5/yolov5n-AFPN.yaml --info
+python train.py --yaml ultralytics/models/v5/yolov5n-act.yaml --info
+python train.py --yaml ultralytics/models/v5/yolov5n-fasternet.yaml --info
+python train.py --yaml ultralytics/models/v8/yolov8-attention.yaml --info
+
+python train.py --yaml ultralytics/models/v5/yolov5-AFPN-P345.yaml --info
+python train.py --yaml ultralytics/models/v5/yolov5-AFPN-P345-Custom.yaml --info
+python train.py --yaml ultralytics/models/v5/yolov5-AFPN-P2345.yaml --info
+python train.py --yaml ultralytics/models/v5/yolov5-AFPN-P2345-Custom.yaml --info
+
+python train.py --yaml ultralytics/models/v8/yolov8-AFPN-P345.yaml --info
+python train.py --yaml ultralytics/models/v8/yolov8-AFPN-P345-Custom.yaml --info
+python train.py --yaml ultralytics/models/v8/yolov8-AFPN-P2345.yaml --info
+python train.py --yaml ultralytics/models/v8/yolov8-AFPN-P2345-Custom.yaml --info
+
+python train.py --weight yolov8n.pt --yaml ultralytics/models/v8/yolov8n.yaml --data /home/hjj/Desktop/dataset/dataset_person/data.yaml --workers 8 --batch 32
+python train.py --yaml ultralytics/models/v8/yolov8n-efficientViT.yaml --data /home/hjj/Desktop/dataset/dataset_person/data.yaml --cache --workers 8 --batch 32 --unamp
+python train.py --yaml ultralytics/models/v8/yolov8n-timm.yaml --data /home/hjj/Desktop/dataset/dataset_person/data.yaml --cache --workers 8 --batch 32 --fraction 0.1
+python train.py --yaml ultralytics/models/v8/yolov8n-fasternet.yaml --data /home/hjj/Desktop/dataset/dataset_person/data.yaml --cache --workers 8 --batch 32 --unamp --fraction 0.1
+python train.py --yaml ultralytics/models/v8/yolov8-C2f-DBB.yaml --data /home/hjj/Desktop/dataset/dataset_person/data.yaml --cache --workers 8 --batch 32 --fraction 0.1
+python train.py --yaml ultralytics/models/v5/yolov5n-dyhead.yaml --data /home/hjj/Desktop/dataset/dataset_person/data.yaml --cache --workers 8 --batch 32 --fraction 0.1
+python train.py --weight yolov8n.pt --yaml ultralytics/models/v8/yolov8n-AFPN-P2345-C2f.yaml --data /home/hjj/Desktop/dataset/dataset_person/data.yaml --workers 4 --batch 16 --fraction 0.1
+
+python train.py --yaml ultralytics/models/v8/yolov8-C2f-Faster-EMA.yaml --data /home/hjj/Desktop/dataset/dataset_person/data.yaml --cache --workers 8 --batch 32 --fraction 0.1
+
+python val.py --weight runs/train/exp/weights/best.pt --data /home/hjj/Desktop/dataset/dataset_person/data.yaml --split test
+python val.py --weight runs/train/exp2/weights/best.pt --data /home/hjj/Desktop/dataset/dataset_person/data.yaml --split test
+python val.py --weight runs/train/exp3/weights/best.pt --data /home/hjj/Desktop/dataset/dataset_person/data.yaml --split test
+python val.py --weight runs/train/exp4/weights/best.pt --data /home/hjj/Desktop/dataset/dataset_person/data.yaml --split test --save_txt
+
+python detect.py --weight runs/train/exp4/weights/best.pt --source video.mp4 --conf 0.25
+
+python train.py --weight yolov8n.pt --yaml ultralytics/models/v8/yolov8n.yaml --data /home/hjj/Desktop/dataset/dataset_person/data.yaml --workers 8 --batch 32 --fraction 0.1
+python train.py --data /home/hjj/Desktop/dataset/dataset_person/data.yaml --workers 8 --batch 32 --fraction 0.1 --resume runs/train/exp/weights/last.pt
+
+python train.py --weight yolov8n.pt --yaml ultralytics/models/v8/yolov8n.yaml --data /home/hjj/Desktop/dataset/dataset_seaship/data.yaml --workers 8 --batch 64 --cache --close_mosaic 20 --epochs 150 
+python val.py --weight runs/train/exp/weights/best.pt --data /home/hjj/Desktop/dataset/dataset_seaship/data.yaml --split test --save_json
+python dataset/yolo2coco.py --image_path /home/hjj/Desktop/dataset/dataset_seaship/images/test --label_path /home/hjj/Desktop/dataset/dataset_seaship/labels/test
+python cal_coco_metrice.py --pred_json runs/val/exp/predictions.json --anno_json data.json
+
+python train.py --weight yolov8n.pt --yaml ultralytics/models/v8/yolov8n.yaml --data /home/hjj/Desktop/dataset/dataset_seaship/data.yaml --workers 8 --batch 64 --cache --epochs 20 --name exp
+python train.py --weight yolov8n.pt --yaml ultralytics/models/v8/yolov8n-timm.yaml --data /home/hjj/Desktop/dataset/dataset_seaship/data.yaml --workers 8 --batch 64 --cache --epochs 20 --name exp1
