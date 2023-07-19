@@ -133,7 +133,9 @@ dmypy.json
 .pyre/
 
 # datasets and projects
-datasets/
+dataset/*
+!dataset/*.py
+!dataset/*.yaml
 runs/
 wandb/
 
@@ -143,6 +145,7 @@ wandb/
 weights/
 *.weights
 *.pt
+*.pth
 *.pb
 *.onnx
 *.engine
@@ -154,3 +157,4 @@ weights/
 *_web_model/
 *_openvino_model/
 *_paddle_model/
+
