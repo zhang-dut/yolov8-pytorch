@@ -1,7 +1,6 @@
 ---
 comments: true
-description: Explore the Caltech-256 dataset, a diverse collection of images used for object recognition tasks in machine learning. Learn to train a YOLO model on the dataset.
-keywords: Ultralytics, YOLO, Caltech-256, dataset, object recognition, machine learning, computer vision, deep learning
+description: Learn about the Caltech-256 dataset, a broad collection of images used for object classification tasks in machine learning and computer vision algorithms.
 ---
 
 # Caltech-256 Dataset

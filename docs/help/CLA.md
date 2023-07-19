@@ -1,6 +1,5 @@
 ---
-description: Understand terms governing contributions to Ultralytics projects including source code, bug fixes, documentation and more. Read our Contributor License Agreement.
-keywords: Ultralytics, Contributor License Agreement, Open Source Software, Contributions, Copyright License, Patent License, Moral Rights
+description: Individual Contributor License Agreement. Settle Intellectual Property issues for Contributions made to anything open source released by Ultralytics.
 ---
 
 # Ultralytics Individual Contributor License Agreement

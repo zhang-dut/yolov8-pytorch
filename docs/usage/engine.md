@@ -1,7 +1,6 @@
 ---
 comments: true
-description: Discover how to customize and extend base Ultralytics YOLO Trainer engines. Support your custom model and dataloader by overriding built-in functions.
-keywords: Ultralytics, YOLO, trainer engines, BaseTrainer, DetectionTrainer, customizing trainers, extending trainers, custom model, custom dataloader
+description: Learn how to train and customize your models fast with the Ultralytics YOLO 'DetectionTrainer' and 'CustomTrainer'. Read more here!
 ---
 
 Both the Ultralytics YOLO command-line and python interfaces are simply a high-level abstraction on the base engine
@@ -15,14 +14,14 @@ custom model and dataloader by just overriding these functions:
 
 * `get_model(cfg, weights)` - The function that builds the model to be trained
 * `get_dataloder()` - The function that builds the dataloader
-  More details and source code can be found in [`BaseTrainer` Reference](../reference/engine/trainer.md)
+  More details and source code can be found in [`BaseTrainer` Reference](../reference/yolo/engine/trainer.md)
 
 ## DetectionTrainer
 
 Here's how you can use the YOLOv8 `DetectionTrainer` and customize it.
 
 ```python
-from ultralytics.models.yolo.detect import DetectionTrainer
+from ultralytics.yolo.v8.detect import DetectionTrainer
 
 trainer = DetectionTrainer(overrides={...})
 trainer.train()
@@ -35,7 +34,7 @@ Let's customize the trainer **to train a custom detection model** that is not su
 simply overloading the existing the `get_model` functionality:
 
 ```python
-from ultralytics.models.yolo.detect import DetectionTrainer
+from ultralytics.yolo.v8.detect import DetectionTrainer
 
 
 class CustomTrainer(DetectionTrainer):
@@ -54,7 +53,7 @@ You now realize that you need to customize the trainer further to:
   Here's how you can do it:
 
 ```python
-from ultralytics.models.yolo.detect import DetectionTrainer
+from ultralytics.yolo.v8.detect import DetectionTrainer
 from ultralytics.nn.tasks import DetectionModel
 
 

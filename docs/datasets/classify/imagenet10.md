@@ -1,7 +1,6 @@
 ---
 comments: true
-description: Explore the compact ImageNet10 Dataset developed by Ultralytics. Ideal for fast testing of computer vision training pipelines and CV model sanity checks.
-keywords: Ultralytics, YOLO, ImageNet10 Dataset, Image detection, Deep Learning, ImageNet, AI model testing, Computer vision, Machine learning
+description: Learn about the ImageNet10 dataset, a compact subset of the original ImageNet dataset designed for quick testing, CI tests, and sanity checks.
 ---
 
 # ImageNet10 Dataset

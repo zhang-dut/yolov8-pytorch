@@ -1,7 +1,6 @@
 ---
 comments: true
-description: Discover how to use YOLOv8 predict mode for various tasks. Learn about different inference sources like images, videos, and data formats.
-keywords: Ultralytics, YOLOv8, predict mode, inference sources, prediction tasks, streaming mode, image processing, video processing, machine learning, AI
+description: Get started with YOLOv8 Predict mode and input sources. Accepts various input sources such as images, videos, and directories.
 ---
 
 <img width="1024" src="https://github.com/ultralytics/assets/raw/main/yolov8/banner-integrations.png">
@@ -12,279 +11,60 @@ passing `stream=True` in the predictor's call method.
 
 !!! example "Predict"
 
-    === "Return a list with `stream=False`"
+    === "Return a list with `Stream=False`"
         ```python
-        from ultralytics import YOLO
-
-        # Load a model
-        model = YOLO('yolov8n.pt')  # pretrained YOLOv8n model
-
-        # Run batched inference on a list of images
-        results = model(['im1.jpg', 'im2.jpg'])  # return a list of Results objects
+        inputs = [img, img]  # list of numpy arrays
+        results = model(inputs)  # list of Results objects
         
-        # Process results list
         for result in results:
             boxes = result.boxes  # Boxes object for bbox outputs
             masks = result.masks  # Masks object for segmentation masks outputs
-            keypoints = result.keypoints  # Keypoints object for pose outputs
             probs = result.probs  # Class probabilities for classification outputs
         ```
 
-    === "Return a generator with `stream=True`"
+    === "Return a generator with `Stream=True`"
         ```python
-        from ultralytics import YOLO
-
-        # Load a model
-        model = YOLO('yolov8n.pt')  # pretrained YOLOv8n model
-
-        # Run batched inference on a list of images
-        results = model(['im1.jpg', 'im2.jpg'], stream=True)  # return a generator of Results objects
+        inputs = [img, img]  # list of numpy arrays
+        results = model(inputs, stream=True)  # generator of Results objects
         
-        # Process results generator
         for result in results:
             boxes = result.boxes  # Boxes object for bbox outputs
             masks = result.masks  # Masks object for segmentation masks outputs
-            keypoints = result.keypoints  # Keypoints object for pose outputs
             probs = result.probs  # Class probabilities for classification outputs
         ```
-
-## Inference Sources
-
-YOLOv8 can process different types of input sources for inference, as shown in the table below. The sources include static images, video streams, and various data formats. The table also indicates whether each source can be used in streaming mode with the argument `stream=True` ✅. Streaming mode is beneficial for processing videos or live streams as it creates a generator of results instead of loading all frames into memory.
 
 !!! tip "Tip"
 
-    Use `stream=True` for processing long videos or large datasets to efficiently manage memory. When `stream=False`, the results for all frames or data points are stored in memory, which can quickly add up and cause out-of-memory errors for large inputs. In contrast, `stream=True` utilizes a generator, which only keeps the results of the current frame or data point in memory, significantly reducing memory consumption and preventing out-of-memory issues.
+    Streaming mode with `stream=True` should be used for long videos or large predict sources, otherwise results will accumuate in memory and will eventually cause out-of-memory errors. 
 
-| Source      | Argument                                   | Type                                  | Notes                                                                      |
-|-------------|--------------------------------------------|---------------------------------------|----------------------------------------------------------------------------|
-| image       | `'image.jpg'`                              | `str` or `Path`                       | Single image file.                                                         |
-| URL         | `'https://ultralytics.com/images/bus.jpg'` | `str`                                 | URL to an image.                                                           |
-| screenshot  | `'screen'`                                 | `str`                                 | Capture a screenshot.                                                      |
-| PIL         | `Image.open('im.jpg')`                     | `PIL.Image`                           | HWC format with RGB channels.                                              |
-| OpenCV      | `cv2.imread('im.jpg')`                     | `np.ndarray` of `uint8 (0-255)`       | HWC format with BGR channels.                                              |
-| numpy       | `np.zeros((640,1280,3))`                   | `np.ndarray` of `uint8 (0-255)`       | HWC format with BGR channels.                                              |
-| torch       | `torch.zeros(16,3,320,640)`                | `torch.Tensor` of `float32 (0.0-1.0)` | BCHW format with RGB channels.                                             |
-| CSV         | `'sources.csv'`                            | `str` or `Path`                       | CSV file containing paths to images, videos, or directories.               |       
-| video ✅     | `'video.mp4'`                              | `str` or `Path`                       | Video file in formats like MP4, AVI, etc.                                  |
-| directory ✅ | `'path/'`                                  | `str` or `Path`                       | Path to a directory containing images or videos.                           |
-| glob ✅      | `'path/*.jpg'`                             | `str`                                 | Glob pattern to match multiple files. Use the `*` character as a wildcard. |
-| YouTube ✅   | `'https://youtu.be/Zgi9g1ksQHc'`           | `str`                                 | URL to a YouTube video.                                                    |
-| stream ✅    | `'rtsp://example.com/media.mp4'`           | `str`                                 | URL for streaming protocols such as RTSP, RTMP, or an IP address.          |
+## Sources
 
-Below are code examples for using each source type:
+YOLOv8 can accept various input sources, as shown in the table below. This includes images, URLs, PIL images, OpenCV,
+numpy arrays, torch tensors, CSV files, videos, directories, globs, YouTube videos, and streams. The table indicates
+whether each source can be used in streaming mode with `stream=True` ✅ and an example argument for each source.
 
-!!! example "Prediction sources"
+| source      | model(arg)                                 | type           | notes            |
+|-------------|--------------------------------------------|----------------|------------------|
+| image       | `'im.jpg'`                                 | `str`, `Path`  |                  |
+| URL         | `'https://ultralytics.com/images/bus.jpg'` | `str`          |                  |
+| screenshot  | `'screen'`                                 | `str`          |                  |
+| PIL         | `Image.open('im.jpg')`                     | `PIL.Image`    | HWC, RGB         |
+| OpenCV      | `cv2.imread('im.jpg')`                     | `np.ndarray`   | HWC, BGR         |
+| numpy       | `np.zeros((640,1280,3))`                   | `np.ndarray`   | HWC              |
+| torch       | `torch.zeros(16,3,320,640)`                | `torch.Tensor` | BCHW, RGB        |
+| CSV         | `'sources.csv'`                            | `str`, `Path`  | RTSP, RTMP, HTTP |         
+| video ✅     | `'vid.mp4'`                                | `str`, `Path`  |                  |
+| directory ✅ | `'path/'`                                  | `str`, `Path`  |                  |
+| glob ✅      | `'path/*.jpg'`                             | `str`          | Use `*` operator |
+| YouTube ✅   | `'https://youtu.be/Zgi9g1ksQHc'`           | `str`          |                  |
+| stream ✅    | `'rtsp://example.com/media.mp4'`           | `str`          | RTSP, RTMP, HTTP |
 
-    === "image"
-        Run inference on an image file. 
-        ```python
-        from ultralytics import YOLO
-    
-        # Load a pretrained YOLOv8n model
-        model = YOLO('yolov8n.pt')
-    
-        # Define path to the image file
-        source = 'path/to/image.jpg'
-    
-        # Run inference on the source
-        results = model(source)  # list of Results objects
-        ```
-    
-    === "screenshot"
-        Run inference on the current screen content as a screenshot.
-        ```python
-        from ultralytics import YOLO
-    
-        # Load a pretrained YOLOv8n model
-        model = YOLO('yolov8n.pt')
-    
-        # Define current screenshot as source
-        source = 'screen'
-    
-        # Run inference on the source
-        results = model(source)  # list of Results objects
-        ```
-    
-    === "URL"
-        Run inference on an image or video hosted remotely via URL.
-        ```python
-        from ultralytics import YOLO
-    
-        # Load a pretrained YOLOv8n model
-        model = YOLO('yolov8n.pt')
-    
-        # Define remote image or video URL
-        source = 'https://ultralytics.com/images/bus.jpg'
-    
-        # Run inference on the source
-        results = model(source)  # list of Results objects
-        ```
-    
-    === "PIL"
-        Run inference on an image opened with Python Imaging Library (PIL).
-        ```python
-        from PIL import Image
-        from ultralytics import YOLO
-    
-        # Load a pretrained YOLOv8n model
-        model = YOLO('yolov8n.pt')
-    
-        # Open an image using PIL
-        source = Image.open('path/to/image.jpg')
-    
-        # Run inference on the source
-        results = model(source)  # list of Results objects
-        ```
-    
-    === "OpenCV"
-        Run inference on an image read with OpenCV.
-        ```python
-        import cv2
-        from ultralytics import YOLO
-    
-        # Load a pretrained YOLOv8n model
-        model = YOLO('yolov8n.pt')
-    
-        # Read an image using OpenCV
-        source = cv2.imread('path/to/image.jpg')
-    
-        # Run inference on the source
-        results = model(source)  # list of Results objects
-        ```
-    
-    === "numpy"
-        Run inference on an image represented as a numpy array.
-        ```python
-        import numpy as np
-        from ultralytics import YOLO
-    
-        # Load a pretrained YOLOv8n model
-        model = YOLO('yolov8n.pt')
-    
-        # Create a random numpy array of HWC shape (640, 640, 3) with values in range [0, 255] and type uint8
-        source = np.random.randint(low=0, high=255, size=(640, 640, 3), dtype='uint8')
-    
-        # Run inference on the source
-        results = model(source)  # list of Results objects
-        ```
-    
-    === "torch"
-        Run inference on an image represented as a PyTorch tensor.
-        ```python
-        import torch
-        from ultralytics import YOLO
-    
-        # Load a pretrained YOLOv8n model
-        model = YOLO('yolov8n.pt')
-    
-        # Create a random torch tensor of BCHW shape (1, 3, 640, 640) with values in range [0, 1] and type float32
-        source = torch.rand(1, 3, 640, 640, dtype=torch.float32)
-    
-        # Run inference on the source
-        results = model(source)  # list of Results objects
-        ```
-    
-    === "CSV"
-        Run inference on a collection of images, URLs, videos and directories listed in a CSV file.
-        ```python
-        import torch
-        from ultralytics import YOLO
-    
-        # Load a pretrained YOLOv8n model
-        model = YOLO('yolov8n.pt')
-    
-        # Define a path to a CSV file with images, URLs, videos and directories
-        source = 'path/to/file.csv'
-    
-        # Run inference on the source
-        results = model(source)  # list of Results objects
-        ```
-    
-    === "video"
-        Run inference on a video file. By using `stream=True`, you can create a generator of Results objects to reduce memory usage.
-        ```python
-        from ultralytics import YOLO
-    
-        # Load a pretrained YOLOv8n model
-        model = YOLO('yolov8n.pt')
-    
-        # Define path to video file
-        source = 'path/to/video.mp4'
-    
-        # Run inference on the source
-        results = model(source, stream=True)  # generator of Results objects
-        ```
-    
-    === "directory"
-        Run inference on all images and videos in a directory. To also capture images and videos in subdirectories use a glob pattern, i.e. `path/to/dir/**/*`.
-        ```python
-        from ultralytics import YOLO
-    
-        # Load a pretrained YOLOv8n model
-        model = YOLO('yolov8n.pt')
-    
-        # Define path to directory containing images and videos for inference
-        source = 'path/to/dir'
-    
-        # Run inference on the source
-        results = model(source, stream=True)  # generator of Results objects
-        ```
-    
-    === "glob"
-        Run inference on all images and videos that match a glob expression with `*` characters.
-        ```python
-        from ultralytics import YOLO
-    
-        # Load a pretrained YOLOv8n model
-        model = YOLO('yolov8n.pt')
-    
-        # Define a glob search for all JPG files in a directory
-        source = 'path/to/dir/*.jpg'
-    
-        # OR define a recursive glob search for all JPG files including subdirectories
-        source = 'path/to/dir/**/*.jpg'
-    
-        # Run inference on the source
-        results = model(source, stream=True)  # generator of Results objects
-        ```
-    
-    === "YouTube"
-        Run inference on a YouTube video. By using `stream=True`, you can create a generator of Results objects to reduce memory usage for long videos.
-        ```python
-        from ultralytics import YOLO
-    
-        # Load a pretrained YOLOv8n model
-        model = YOLO('yolov8n.pt')
-    
-        # Define source as YouTube video URL
-        source = 'https://youtu.be/Zgi9g1ksQHc'
-    
-        # Run inference on the source
-        results = model(source, stream=True)  # generator of Results objects
-        ```
-    
-    === "Stream"
-        Run inference on remote streaming sources using RTSP, RTMP, and IP address protocols.
-        ```python
-        from ultralytics import YOLO
-    
-        # Load a pretrained YOLOv8n model
-        model = YOLO('yolov8n.pt')
-    
-        # Define source as RTSP, RTMP or IP streaming address
-        source = 'rtsp://example.com/media.mp4'
-    
-        # Run inference on the source
-        results = model(source, stream=True)  # generator of Results objects
-        ```
-
-## Inference Arguments
+## Arguments
 
 `model.predict` accepts multiple arguments that control the prediction operation. These arguments can be passed directly to `model.predict`:
 !!! example
 
-    ```python
+    ```
     model.predict(source, save=True, imgsz=320, conf=0.5)
     ```
 
@@ -316,11 +96,11 @@ All supported arguments:
 
 ## Image and Video Formats
 
-YOLOv8 supports various image and video formats, as specified in [data/utils.py](https://github.com/ultralytics/ultralytics/blob/main/ultralytics/data/utils.py). See the tables below for the valid suffixes and example predict commands.
+YOLOv8 supports various image and video formats, as specified
+in [yolo/data/utils.py](https://github.com/ultralytics/ultralytics/blob/main/ultralytics/yolo/data/utils.py). See the
+tables below for the valid suffixes and example predict commands.
 
 ### Image Suffixes
-
-The below table contains valid Ultralytics image formats.
 
 | Image Suffixes | Example Predict Command          | Reference                                                                     |
 |----------------|----------------------------------|-------------------------------------------------------------------------------|
@@ -336,8 +116,6 @@ The below table contains valid Ultralytics image formats.
 | .pfm           | `yolo predict source=image.pfm`  | [Portable FloatMap](https://en.wikipedia.org/wiki/Netpbm#File_formats)        |
 
 ### Video Suffixes
-
-The below table contains valid Ultralytics video formats.
 
 | Video Suffixes | Example Predict Command          | Reference                                                                        |
 |----------------|----------------------------------|----------------------------------------------------------------------------------|
@@ -451,7 +229,7 @@ operations are cached, meaning they're only calculated once per object, and thos
     keypoints.data  # raw probs tensor, (num_class, ) 
     ```
 
-Class reference documentation for `Results` module and its components can be found [here](../reference/engine/results.md)
+Class reference documentation for `Results` module and its components can be found [here](../reference/yolo/engine/results.md)
 
 ## Plotting results
 

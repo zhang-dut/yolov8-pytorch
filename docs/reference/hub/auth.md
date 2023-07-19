@@ -1,9 +1,8 @@
 ---
-description: Dive into the Ultralytics Auth API documentation & learn how to manage authentication in your AI & ML projects easily and effectively.
-keywords: Ultralytics, Auth, API documentation, User Authentication, AI, Machine Learning
+description: Learn how to use Ultralytics hub authentication in your projects with examples and guidelines from the Auth page on Ultralytics Docs.
 ---
 
-## Auth
+# Auth
 ---
-### ::: ultralytics.hub.auth.Auth
+:::ultralytics.hub.auth.Auth
 <br><br>

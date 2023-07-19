@@ -1,6 +1,5 @@
 ---
-description: Discover how Ultralytics ensures the safety of user data and systems. Check out the measures we have implemented, including Snyk and GitHub CodeQL Scanning.
-keywords: Ultralytics, Security Policy, data security, open-source projects, Snyk scanning, CodeQL scanning, vulnerability detection, threat prevention
+description: Ensure robust security with Ultralytics' open-source projects. We use advanced vulnerability scans and actively address potential risks. Your safety is our priority.
 ---
 
 # Security Policy

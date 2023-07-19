@@ -1,7 +1,6 @@
 ---
 comments: true
-description: Learn how to use the Fashion-MNIST dataset for image classification with the Ultralytics YOLO model. Covers dataset structure, labels, applications, and usage.
-keywords: Ultralytics, YOLO, Fashion-MNIST, dataset, image classification, machine learning, deep learning, neural networks, training, testing
+description: Learn about the Fashion-MNIST dataset, a large database of Zalando's article images used for training various image processing systems and machine learning models.
 ---
 
 # Fashion-MNIST Dataset

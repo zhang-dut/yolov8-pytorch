@@ -1,10 +1,9 @@
 ---
 comments: true
-description: Learn how to use Ultralytics YOLO for object tracking in video streams. Guides to use different trackers and customise tracker configurations.
-keywords: Ultralytics, YOLO, object tracking, video streams, BoT-SORT, ByteTrack, Python guide, CLI guide
+description: Explore YOLOv8n-based object tracking with Ultralytics' BoT-SORT and ByteTrack. Learn configuration, usage, and customization tips.
 ---
 
-<img width="1024" src="https://user-images.githubusercontent.com/26833433/243418637-1d6250fd-1515-4c10-a844-a32818ae6d46.png">
+<img width="1024" src="https://github.com/ultralytics/assets/raw/main/yolov8/banner-integrations.png">
 
 Object tracking is a task that involves identifying the location and class of objects, then assigning a unique ID to
 that detection in video streams.
@@ -79,7 +78,7 @@ to [predict page](https://docs.ultralytics.com/modes/predict/).
 ### Tracker
 
 We also support using a modified tracker config file, just copy a config file i.e `custom_tracker.yaml`
-from [ultralytics/cfg/trackers](https://github.com/ultralytics/ultralytics/tree/main/ultralytics/cfg/trackers) and modify
+from [ultralytics/tracker/cfg](https://github.com/ultralytics/ultralytics/tree/main/ultralytics/tracker/cfg) and modify
 any configurations(expect the `tracker_type`) you need to.
 !!! example ""
 
@@ -97,5 +96,6 @@ any configurations(expect the `tracker_type`) you need to.
         yolo track model=yolov8n.pt source="https://youtu.be/Zgi9g1ksQHc" tracker='custom_tracker.yaml'
         ```
 
-Please refer to [ultralytics/cfg/trackers](https://github.com/ultralytics/ultralytics/tree/main/ultralytics/cfg/trackers)
+Please refer to [ultralytics/tracker/cfg](https://github.com/ultralytics/ultralytics/tree/main/ultralytics/tracker/cfg)
 page
+
