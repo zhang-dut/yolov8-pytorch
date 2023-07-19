@@ -4,19 +4,22 @@ import contextlib
 from copy import deepcopy
 from pathlib import Path
 
+import timm
 import torch
 import torch.nn as nn
 
-from ultralytics.nn.modules import (AIFI, C1, C2, C3, C3TR, SPP, SPPF, Bottleneck, BottleneckCSP, C2f, C3Ghost, C3x,
-                                    Classify, Concat, Conv, Conv2, ConvTranspose, Detect, DWConv, DWConvTranspose2d,
-                                    Focus, GhostBottleneck, GhostConv, HGBlock, HGStem, Pose, RepC3, RepConv,
-                                    RTDETRDecoder, Segment)
-from ultralytics.utils import DEFAULT_CFG_DICT, DEFAULT_CFG_KEYS, LOGGER, colorstr, emojis, yaml_load
-from ultralytics.utils.checks import check_requirements, check_suffix, check_yaml
-from ultralytics.utils.loss import v8ClassificationLoss, v8DetectionLoss, v8PoseLoss, v8SegmentationLoss
-from ultralytics.utils.plotting import feature_visualization
-from ultralytics.utils.torch_utils import (fuse_conv_and_bn, fuse_deconv_and_bn, initialize_weights, intersect_dicts,
-                                           make_divisible, model_info, scale_img, time_sync)
+from ultralytics.nn.modules import *
+from ultralytics.yolo.utils import DEFAULT_CFG_DICT, DEFAULT_CFG_KEYS, LOGGER, colorstr, emojis, yaml_load
+from ultralytics.yolo.utils.checks import check_requirements, check_suffix, check_yaml
+from ultralytics.yolo.utils.loss import v8ClassificationLoss, v8DetectionLoss, v8PoseLoss, v8SegmentationLoss
+from ultralytics.yolo.utils.plotting import feature_visualization
+from ultralytics.yolo.utils.torch_utils import (fuse_conv_and_bn, fuse_deconv_and_bn, initialize_weights,
+                                                intersect_dicts, make_divisible, model_info, scale_img, time_sync, get_num_params)
+
+from ultralytics.nn.backbone.convnextv2 import *
+from ultralytics.nn.backbone.fasternet import *
+from ultralytics.nn.backbone.efficientViT import *
+from ultralytics.nn.backbone.EfficientFormerV2 import *
 
 try:
     import thop
@@ -79,8 +82,19 @@ class BaseModel(nn.Module):
                 x = y[m.f] if isinstance(m.f, int) else [x if j == -1 else y[j] for j in m.f]  # from earlier layers
             if profile:
                 self._profile_one_layer(m, x, dt)
-            x = m(x)  # run
-            y.append(x if m.i in self.save else None)  # save output
+            if hasattr(m, 'backbone'):
+                x = m(x)
+                for _ in range(5 - len(x)):
+                    x.insert(0, None)
+                for i_idx, i in enumerate(x):
+                    if i_idx in self.save:
+                        y.append(i)
+                    else:
+                        y.append(None)
+                x = x[-1]
+            else:
+                x = m(x)  # run
+                y.append(x if m.i in self.save else None)  # save output
             if visualize:
                 feature_visualization(x, m.type, m.i, save_dir=visualize)
         return x
@@ -106,14 +120,18 @@ class BaseModel(nn.Module):
             None
         """
         c = m == self.model[-1]  # is final layer, copy input as inplace fix
-        o = thop.profile(m, inputs=[x.clone() if c else x], verbose=False)[0] / 1E9 * 2 if thop else 0  # FLOPs
+        if type(x) is list:
+            bs = x[0].size(0)
+        else:
+            bs = x.size(0)
+        o = thop.profile(m, inputs=[x.copy() if c else x], verbose=False)[0] / 1E9 * 2 / bs if thop else 0  # FLOPs
         t = time_sync()
         for _ in range(10):
-            m(x.clone() if c else x)
+            m(x.copy() if c else x)
         dt.append((time_sync() - t) * 100)
         if m == self.model[0]:
             LOGGER.info(f"{'time (ms)':>10s} {'GFLOPs':>10s} {'params':>10s}  module")
-        LOGGER.info(f'{dt[-1]:10.2f} {o:10.2f} {m.np:10.0f}  {m.type}')
+        LOGGER.info(f'{dt[-1]:10.2f} {o:10.2f} {get_num_params(m):10.0f}  {m.type}')
         if c:
             LOGGER.info(f"{sum(dt):10.2f} {'-':>10s} {'-':>10s}  Total")
 
@@ -140,6 +158,9 @@ class BaseModel(nn.Module):
                 if isinstance(m, RepConv):
                     m.fuse_convs()
                     m.forward = m.forward_fuse  # update forward
+                if hasattr(m, 'switch_to_deploy'):
+                    m.switch_to_deploy()
+                
             self.info(verbose=verbose)
 
         return self
@@ -180,7 +201,7 @@ class BaseModel(nn.Module):
         """
         self = super()._apply(fn)
         m = self.model[-1]  # Detect()
-        if isinstance(m, (Detect, Segment)):
+        if isinstance(m, (Detect, Detect_DyHead, Detect_AFPN_P2345, Detect_AFPN_P2345_Custom, Detect_AFPN_P345, Detect_AFPN_P345_Custom, Segment)):
             m.stride = fn(m.stride)
             m.anchors = fn(m.anchors)
             m.strides = fn(m.strides)
@@ -190,7 +211,7 @@ class BaseModel(nn.Module):
         """Load the weights into the model.
 
         Args:
-            weights (dict | torch.nn.Module): The pre-trained weights to be loaded.
+            weights (dict) or (torch.nn.Module): The pre-trained weights to be loaded.
             verbose (bool, optional): Whether to log the transfer progress. Defaults to True.
         """
         model = weights['model'] if isinstance(weights, dict) else weights  # torchvision models are not dicts
@@ -210,9 +231,7 @@ class BaseModel(nn.Module):
         """
         if not hasattr(self, 'criterion'):
             self.criterion = self.init_criterion()
-
-        preds = self.forward(batch['img']) if preds is None else preds
-        return self.criterion(preds, batch)
+        return self.criterion(self.predict(batch['img']) if preds is None else preds, batch)
 
     def init_criterion(self):
         raise NotImplementedError('compute_loss() needs to be implemented by task heads')
@@ -236,15 +255,13 @@ class DetectionModel(BaseModel):
 
         # Build strides
         m = self.model[-1]  # Detect()
-        if isinstance(m, (Detect, Segment, Pose)):
-            s = 256  # 2x min stride
+        if isinstance(m, (Detect, Detect_DyHead, Detect_AFPN_P2345, Detect_AFPN_P2345_Custom, Detect_AFPN_P345, Detect_AFPN_P345_Custom, Segment, Pose)):
+            s = 640  # 2x min stride
             m.inplace = self.inplace
             forward = lambda x: self.forward(x)[0] if isinstance(m, (Segment, Pose)) else self.forward(x)
-            m.stride = torch.tensor([s / x.shape[-2] for x in forward(torch.zeros(1, ch, s, s))])  # forward
+            m.stride = torch.tensor([s / x.shape[-2] for x in forward(torch.zeros(2, ch, s, s))])  # forward
             self.stride = m.stride
             m.bias_init()  # only run once
-        else:
-            self.stride = torch.Tensor([32])  # default stride for i.e. RTDETR
 
         # Init weights, biases
         initialize_weights(self)
@@ -412,9 +429,9 @@ class RTDETRDetectionModel(DetectionModel):
 
     def init_criterion(self):
         """Compute the classification loss between predictions and true labels."""
-        from ultralytics.models.utils.loss import RTDETRDetectionLoss
+        from ultralytics.vit.utils.loss import RTDETRDetectionLoss
 
-        return RTDETRDetectionLoss(nc=self.nc, use_vfl=True)
+        return RTDETRDetectionLoss(num_classes=self.nc, use_vfl=True)
 
     def loss(self, batch, preds=None):
         if not hasattr(self, 'criterion'):
@@ -424,34 +441,31 @@ class RTDETRDetectionModel(DetectionModel):
         # NOTE: preprocess gt_bbox and gt_labels to list.
         bs = len(img)
         batch_idx = batch['batch_idx']
-        gt_groups = [(batch_idx == i).sum().item() for i in range(bs)]
-        targets = {
-            'cls': batch['cls'].to(img.device, dtype=torch.long).view(-1),
-            'bboxes': batch['bboxes'].to(device=img.device),
-            'batch_idx': batch_idx.to(img.device, dtype=torch.long).view(-1),
-            'gt_groups': gt_groups}
+        gt_bbox, gt_class = [], []
+        for i in range(bs):
+            gt_bbox.append(batch['bboxes'][batch_idx == i].to(img.device))
+            gt_class.append(batch['cls'][batch_idx == i].to(device=img.device, dtype=torch.long))
+        targets = {'cls': gt_class, 'bboxes': gt_bbox}
 
         preds = self.predict(img, batch=targets) if preds is None else preds
-        dec_bboxes, dec_scores, enc_bboxes, enc_scores, dn_meta = preds if self.training else preds[1]
+        dec_out_bboxes, dec_out_logits, enc_topk_bboxes, enc_topk_logits, dn_meta = preds
+        # NOTE: `dn_meta` means it's eval mode, loss calculation for eval mode is not supported.
         if dn_meta is None:
-            dn_bboxes, dn_scores = None, None
-        else:
-            dn_bboxes, dec_bboxes = torch.split(dec_bboxes, dn_meta['dn_num_split'], dim=2)
-            dn_scores, dec_scores = torch.split(dec_scores, dn_meta['dn_num_split'], dim=2)
+            return 0, torch.zeros(3, device=dec_out_bboxes.device)
+        dn_out_bboxes, dec_out_bboxes = torch.split(dec_out_bboxes, dn_meta['dn_num_split'], dim=2)
+        dn_out_logits, dec_out_logits = torch.split(dec_out_logits, dn_meta['dn_num_split'], dim=2)
 
-        dec_bboxes = torch.cat([enc_bboxes.unsqueeze(0), dec_bboxes])  # (7, bs, 300, 4)
-        dec_scores = torch.cat([enc_scores.unsqueeze(0), dec_scores])
+        out_bboxes = torch.cat([enc_topk_bboxes.unsqueeze(0), dec_out_bboxes])
+        out_logits = torch.cat([enc_topk_logits.unsqueeze(0), dec_out_logits])
 
-        loss = self.criterion((dec_bboxes, dec_scores),
+        loss = self.criterion((out_bboxes, out_logits),
                               targets,
-                              dn_bboxes=dn_bboxes,
-                              dn_scores=dn_scores,
+                              dn_out_bboxes=dn_out_bboxes,
+                              dn_out_logits=dn_out_logits,
                               dn_meta=dn_meta)
-        # NOTE: There are like 12 losses in RTDETR, backward with all losses but only show the main three losses.
-        return sum(loss.values()), torch.as_tensor([loss[k].detach() for k in ['loss_giou', 'loss_class', 'loss_bbox']],
-                                                   device=img.device)
+        return sum(loss.values()), torch.as_tensor([loss[k].detach() for k in ['loss_giou', 'loss_class', 'loss_bbox']])
 
-    def predict(self, x, profile=False, visualize=False, batch=None, augment=False):
+    def predict(self, x, profile=False, visualize=False, batch=None):
         """
         Perform a forward pass through the network.
 
@@ -498,45 +512,6 @@ class Ensemble(nn.ModuleList):
 # Functions ------------------------------------------------------------------------------------------------------------
 
 
-@contextlib.contextmanager
-def temporary_modules(modules=None):
-    """
-    Context manager for temporarily adding or modifying modules in Python's module cache (`sys.modules`).
-
-    This function can be used to change the module paths during runtime. It's useful when refactoring code,
-    where you've moved a module from one location to another, but you still want to support the old import
-    paths for backwards compatibility.
-
-    Args:
-        modules (dict, optional): A dictionary mapping old module paths to new module paths.
-
-    Example:
-        with temporary_modules({'old.module.path': 'new.module.path'}):
-            import old.module.path  # this will now import new.module.path
-
-    Note:
-        The changes are only in effect inside the context manager and are undone once the context manager exits.
-        Be aware that directly manipulating `sys.modules` can lead to unpredictable results, especially in larger
-        applications or libraries. Use this function with caution.
-    """
-    if not modules:
-        modules = {}
-
-    import importlib
-    import sys
-    try:
-        # Set modules in sys.modules under their old name
-        for old, new in modules.items():
-            sys.modules[old] = importlib.import_module(new)
-
-        yield
-    finally:
-        # Remove the temporary module paths
-        for old in modules:
-            if old in sys.modules:
-                del sys.modules[old]
-
-
 def torch_safe_load(weight):
     """
     This function attempts to load a PyTorch model with the torch.load() function. If a ModuleNotFoundError is raised,
@@ -549,17 +524,12 @@ def torch_safe_load(weight):
     Returns:
         (dict): The loaded PyTorch model.
     """
-    from ultralytics.utils.downloads import attempt_download_asset
+    from ultralytics.yolo.utils.downloads import attempt_download_asset
 
     check_suffix(file=weight, suffix='.pt')
     file = attempt_download_asset(weight)  # search online if missing locally
     try:
-        with temporary_modules({
-                'ultralytics.yolo.utils': 'ultralytics.utils',
-                'ultralytics.yolo.v8': 'ultralytics.models.yolo',
-                'ultralytics.yolo.data': 'ultralytics.data'}):  # for legacy 8.0 Classify and Pose models
-            return torch.load(file, map_location='cpu'), file  # load
-
+        return torch.load(file, map_location='cpu'), file  # load
     except ModuleNotFoundError as e:  # e.name is missing module name
         if e.name == 'models':
             raise TypeError(
@@ -599,7 +569,7 @@ def attempt_load_weights(weights, device=None, inplace=True, fuse=False):
     # Module compatibility updates
     for m in ensemble.modules():
         t = type(m)
-        if t in (nn.Hardswish, nn.LeakyReLU, nn.ReLU, nn.ReLU6, nn.SiLU, Detect, Segment):
+        if t in (nn.Hardswish, nn.LeakyReLU, nn.ReLU, nn.ReLU6, nn.SiLU, Detect, Detect_DyHead, Segment):
             m.inplace = inplace  # torch 1.7.0 compatibility
         elif t is nn.Upsample and not hasattr(m, 'recompute_scale_factor'):
             m.recompute_scale_factor = None  # torch 1.11.0 compatibility
@@ -635,7 +605,7 @@ def attempt_load_one_weight(weight, device=None, inplace=True, fuse=False):
     # Module compatibility updates
     for m in model.modules():
         t = type(m)
-        if t in (nn.Hardswish, nn.LeakyReLU, nn.ReLU, nn.ReLU6, nn.SiLU, Detect, Segment):
+        if t in (nn.Hardswish, nn.LeakyReLU, nn.ReLU, nn.ReLU6, nn.SiLU, Detect, Detect_DyHead, Detect_AFPN_P2345, Detect_AFPN_P2345_Custom, Detect_AFPN_P345, Detect_AFPN_P345_Custom, Segment):
             m.inplace = inplace  # torch 1.7.0 compatibility
         elif t is nn.Upsample and not hasattr(m, 'recompute_scale_factor'):
             m.recompute_scale_factor = None  # torch 1.11.0 compatibility
@@ -645,12 +615,13 @@ def attempt_load_one_weight(weight, device=None, inplace=True, fuse=False):
 
 
 def parse_model(d, ch, verbose=True):  # model_dict, input_channels(3)
-    """Parse a YOLO model.yaml dictionary into a PyTorch model."""
+    # Parse a YOLO model.yaml dictionary into a PyTorch model
     import ast
 
     # Args
     max_channels = float('inf')
-    nc, act, scales = (d.get(x) for x in ('nc', 'activation', 'scales'))
+    nc, act, scales = (d.get(x) for x in ('nc', 'act', 'scales'))
+    
     depth, width, kpt_shape = (d.get(x, 1.0) for x in ('depth_multiple', 'width_multiple', 'kpt_shape'))
     if scales:
         scale = d.get('scale')
@@ -665,25 +636,43 @@ def parse_model(d, ch, verbose=True):  # model_dict, input_channels(3)
             LOGGER.info(f"{colorstr('activation:')} {act}")  # print
 
     if verbose:
-        LOGGER.info(f"\n{'':>3}{'from':>20}{'n':>3}{'params':>10}  {'module':<45}{'arguments':<30}")
+        LOGGER.info(f"\n{'':>3}{'from':>20}{'n':>3}{'params':>10}  {'module':<60}{'arguments':<30}")
     ch = [ch]
     layers, save, c2 = [], [], ch[-1]  # layers, savelist, ch out
+    is_backbone = False
     for i, (f, n, m, args) in enumerate(d['backbone'] + d['head']):  # from, number, module, args
-        m = getattr(torch.nn, m[3:]) if 'nn.' in m else globals()[m]  # get module
+        try:
+            if m == 'node_mode':
+                m = d[m]
+                if len(args) > 0:
+                    if args[0] == 'head_channel':
+                        args[0] = int(d[args[0]])
+            t = m
+            m = getattr(torch.nn, m[3:]) if 'nn.' in m else globals()[m]  # get module
+        except:
+            pass
+        
         for j, a in enumerate(args):
             if isinstance(a, str):
                 with contextlib.suppress(ValueError):
-                    args[j] = locals()[a] if a in locals() else ast.literal_eval(a)
+                    try:
+                        args[j] = locals()[a] if a in locals() else ast.literal_eval(a)
+                    except:
+                        args[j] = a
 
         n = n_ = max(round(n * depth), 1) if n > 1 else n  # depth gain
         if m in (Classify, Conv, ConvTranspose, GhostConv, Bottleneck, GhostBottleneck, SPP, SPPF, DWConv, Focus,
-                 BottleneckCSP, C1, C2, C2f, C3, C3TR, C3Ghost, nn.ConvTranspose2d, DWConvTranspose2d, C3x, RepC3):
+                 BottleneckCSP, C1, C2, C2f, C3, C3TR, C3Ghost, nn.ConvTranspose2d, DWConvTranspose2d, C3x, RepC3, C2f_Faster, C2f_ODConv,
+                 C2f_Faster_EMA, C2f_DBB, GSConv, VoVGSCSP, VoVGSCSPC):
+            if args[0] == 'head_channel':
+                args[0] = d[args[0]]
             c1, c2 = ch[f], args[0]
             if c2 != nc:  # if c2 not equal to number of classes (i.e. for Classify() output)
                 c2 = make_divisible(min(c2, max_channels) * width, 8)
 
             args = [c1, c2, *args[1:]]
-            if m in (BottleneckCSP, C1, C2, C2f, C3, C3TR, C3Ghost, C3x, RepC3):
+            if m in (BottleneckCSP, C1, C2, C2f, C3, C3TR, C3Ghost, C3x, RepC3, C2f_Faster, C2f_ODConv, C2f_Faster_EMA, C2f_DBB,
+                     VoVGSCSP, VoVGSCSPC):
                 args.insert(2, n)  # number of repeats
                 n = 1
         elif m is AIFI:
@@ -694,29 +683,62 @@ def parse_model(d, ch, verbose=True):  # model_dict, input_channels(3)
             if m is HGBlock:
                 args.insert(4, n)  # number of repeats
                 n = 1
-
         elif m is nn.BatchNorm2d:
             args = [ch[f]]
         elif m is Concat:
             c2 = sum(ch[x] for x in f)
-        elif m in (Detect, Segment, Pose, RTDETRDecoder):
+        elif m in (Detect, Detect_DyHead, Detect_AFPN_P2345, Detect_AFPN_P2345_Custom, Detect_AFPN_P345, Detect_AFPN_P345_Custom, Segment, Pose, RTDETRDecoder):
             args.append([ch[x] for x in f])
             if m is Segment:
                 args[2] = make_divisible(min(args[2], max_channels) * width, 8)
+        elif m is Fusion:
+            args[0] = d[args[0]]
+            c1, c2 = [ch[x] for x in f], (sum([ch[x] for x in f]) if args[0] == 'concat' else ch[f[0]])
+            args = [c1, args[0]]
+        elif isinstance(m, str):
+            t = m
+            m = timm.create_model(m, pretrained=args[0], features_only=True)
+            c2 = m.feature_info.channels()
+        elif m in {convnextv2_atto, convnextv2_femto, convnextv2_pico, convnextv2_nano, convnextv2_tiny, convnextv2_base, convnextv2_large, convnextv2_huge,
+                   fasternet_t0, fasternet_t1, fasternet_t2, fasternet_s, fasternet_m, fasternet_l,
+                   efficientvit_b0, efficientvit_b1, efficientvit_b2, efficientvit_b3,
+                   efficientformerv2_s0, efficientformerv2_s1, efficientformerv2_s2, efficientformerv2_l
+                   }:
+            m = m(*args)
+            c2 = m.channel
+        elif m in {EMA, SpatialAttention, BiLevelRoutingAttention, BiLevelRoutingAttention_nchw,
+                   TripletAttention, CoordAtt, CBAM, BAMBlock}:
+            c2 = ch[f]
+            args = [c2, *args]
+            # print(args)
+        elif m in {SimAM, SpatialGroupEnhance}:
+            # print(args)
+            pass
         else:
             c2 = ch[f]
 
-        m_ = nn.Sequential(*(m(*args) for _ in range(n))) if n > 1 else m(*args)  # module
-        t = str(m)[8:-2].replace('__main__.', '')  # module type
+        if isinstance(c2, list):
+            is_backbone = True
+            m_ = m
+            m_.backbone = True
+        else:
+            m_ = nn.Sequential(*(m(*args) for _ in range(n))) if n > 1 else m(*args)  # module
+            t = str(m)[8:-2].replace('__main__.', '')  # module type
+        
         m.np = sum(x.numel() for x in m_.parameters())  # number params
-        m_.i, m_.f, m_.type = i, f, t  # attach index, 'from' index, type
+        m_.i, m_.f, m_.type = i + 4 if is_backbone else i, f, t  # attach index, 'from' index, type
         if verbose:
-            LOGGER.info(f'{i:>3}{str(f):>20}{n_:>3}{m.np:10.0f}  {t:<45}{str(args):<30}')  # print
-        save.extend(x % i for x in ([f] if isinstance(f, int) else f) if x != -1)  # append to savelist
+            LOGGER.info(f'{i:>3}{str(f):>20}{n_:>3}{m.np:10.0f}  {t:<60}{str(args):<30}')  # print
+        save.extend(x % (i + 4 if is_backbone else i) for x in ([f] if isinstance(f, int) else f) if x != -1)  # append to savelist
         layers.append(m_)
         if i == 0:
             ch = []
-        ch.append(c2)
+        if isinstance(c2, list):
+            ch.extend(c2)
+            for _ in range(5 - len(ch)):
+                ch.insert(0, 0)
+        else:
+            ch.append(c2)
     return nn.Sequential(*layers), sorted(save)
 
 
@@ -728,7 +750,7 @@ def yaml_model_load(path):
     if path.stem in (f'yolov{d}{x}6' for x in 'nsmlx' for d in (5, 8)):
         new_stem = re.sub(r'(\d+)([nslmx])6(.+)?$', r'\1\2-p6\3', path.stem)
         LOGGER.warning(f'WARNING ⚠️ Ultralytics YOLO P6 models now use -p6 suffix. Renaming {path.stem} to {new_stem}.')
-        path = path.with_name(new_stem + path.suffix)
+        path = path.with_stem(new_stem)
 
     unified_path = re.sub(r'(\d+)([nslmx])(.+)?$', r'\1\3', str(path))  # i.e. yolov8x.yaml -> yolov8.yaml
     yaml_file = check_yaml(unified_path, hard=False) or check_yaml(path)
@@ -745,7 +767,7 @@ def guess_model_scale(model_path):
     which is denoted by n, s, m, l, or x. The function returns the size character of the model scale as a string.
 
     Args:
-        model_path (str | Path): The path to the YOLO model's YAML file.
+        model_path (str) or (Path): The path to the YOLO model's YAML file.
 
     Returns:
         (str): The size character of the model's scale, which can be n, s, m, l, or x.
@@ -761,7 +783,7 @@ def guess_model_task(model):
     Guess the task of a PyTorch model from its architecture or configuration.
 
     Args:
-        model (nn.Module | dict): PyTorch model or model configuration in YAML format.
+        model (nn.Module) or (dict): PyTorch model or model configuration in YAML format.
 
     Returns:
         (str): Task of the model ('detect', 'segment', 'classify', 'pose').
@@ -775,7 +797,7 @@ def guess_model_task(model):
         m = cfg['head'][-1][-2].lower()  # output module name
         if m in ('classify', 'classifier', 'cls', 'fc'):
             return 'classify'
-        if m == 'detect':
+        if 'detect' in m:
             return 'detect'
         if m == 'segment':
             return 'segment'
@@ -797,7 +819,7 @@ def guess_model_task(model):
                 return cfg2task(eval(x))
 
         for m in model.modules():
-            if isinstance(m, Detect):
+            if isinstance(m, (Detect, Detect_DyHead, Detect_AFPN_P2345, Detect_AFPN_P2345_Custom, Detect_AFPN_P345, Detect_AFPN_P345_Custom)):
                 return 'detect'
             elif isinstance(m, Segment):
                 return 'segment'

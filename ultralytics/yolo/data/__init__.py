@@ -1,17 +1,9 @@
-import importlib
-import sys
+# Ultralytics YOLO 🚀, AGPL-3.0 license
 
-from ultralytics.utils import LOGGER
+from .base import BaseDataset
+from .build import build_dataloader, build_yolo_dataset, load_inference_source
+from .dataset import ClassificationDataset, SemanticDataset, YOLODataset
+from .dataset_wrappers import MixAndRectDataset
 
-# Set modules in sys.modules under their old name
-sys.modules['ultralytics.yolo.data'] = importlib.import_module('ultralytics.data')
-# This is for updating old cls models, or the way in following warning won't work.
-sys.modules['ultralytics.yolo.data.augment'] = importlib.import_module('ultralytics.data.augment')
-
-DATA_WARNING = """WARNING ⚠️ 'ultralytics.yolo.data' is deprecated since '8.0.136' and will be removed in '8.1.0'. Please use 'ultralytics.data' instead.
-Note this warning may be related to loading older models. You can update your model to current structure with:
-    import torch
-    ckpt = torch.load("model.pt")  # applies to both official and custom models
-    torch.save(ckpt, "updated-model.pt")
-"""
-LOGGER.warning(DATA_WARNING)
+__all__ = ('BaseDataset', 'ClassificationDataset', 'MixAndRectDataset', 'SemanticDataset', 'YOLODataset',
+           'build_yolo_dataset', 'build_dataloader', 'load_inference_source')
