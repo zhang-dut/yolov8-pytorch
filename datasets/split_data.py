@@ -3,8 +3,8 @@ random.seed(0)
 import numpy as np
 from sklearn.model_selection import train_test_split
 
-val_size = 0.1
-test_size = 0.2
+val_size = 0.2
+test_size = 0
 postfix = 'jpg'
 imgpath = 'VOCdevkit/JPEGImages'
 txtpath = 'VOCdevkit/txt'
