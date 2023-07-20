@@ -133,9 +133,9 @@ dmypy.json
 .pyre/
 
 # datasets and projects
-dataset/*
-!dataset/*.py
-!dataset/*.yaml
+datasets/*
+!datasets/*.py
+!datasets/*.yaml
 runs/
 wandb/
 
