@@ -17,4 +17,4 @@ from .block import *
 from .conv import *
 from .head import *
 from .transformer import *
-from .attention import *
+from ..extra_modules.attention import *

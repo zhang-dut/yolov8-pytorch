@@ -8,6 +8,7 @@ import timm
 import torch
 import torch.nn as nn
 
+from ultralytics.nn.extra_modules import *
 from ultralytics.nn.modules import *
 from ultralytics.yolo.utils import DEFAULT_CFG_DICT, DEFAULT_CFG_KEYS, LOGGER, colorstr, emojis, yaml_load
 from ultralytics.yolo.utils.checks import check_requirements, check_suffix, check_yaml
@@ -20,6 +21,9 @@ from ultralytics.nn.backbone.convnextv2 import *
 from ultralytics.nn.backbone.fasternet import *
 from ultralytics.nn.backbone.efficientViT import *
 from ultralytics.nn.backbone.EfficientFormerV2 import *
+from ultralytics.nn.backbone.VanillaNet import *
+from ultralytics.nn.backbone.revcol import *
+from ultralytics.nn.backbone.lsknet import *
 
 try:
     import thop
@@ -663,7 +667,7 @@ def parse_model(d, ch, verbose=True):  # model_dict, input_channels(3)
         n = n_ = max(round(n * depth), 1) if n > 1 else n  # depth gain
         if m in (Classify, Conv, ConvTranspose, GhostConv, Bottleneck, GhostBottleneck, SPP, SPPF, DWConv, Focus,
                  BottleneckCSP, C1, C2, C2f, C3, C3TR, C3Ghost, nn.ConvTranspose2d, DWConvTranspose2d, C3x, RepC3, C2f_Faster, C2f_ODConv,
-                 C2f_Faster_EMA, C2f_DBB, GSConv, VoVGSCSP, VoVGSCSPC):
+                 C2f_Faster_EMA, C2f_DBB, GSConv, VoVGSCSP, VoVGSCSPC, C2f_CloAtt, C3_CloAtt):
             if args[0] == 'head_channel':
                 args[0] = d[args[0]]
             c1, c2 = ch[f], args[0]
@@ -672,7 +676,7 @@ def parse_model(d, ch, verbose=True):  # model_dict, input_channels(3)
 
             args = [c1, c2, *args[1:]]
             if m in (BottleneckCSP, C1, C2, C2f, C3, C3TR, C3Ghost, C3x, RepC3, C2f_Faster, C2f_ODConv, C2f_Faster_EMA, C2f_DBB,
-                     VoVGSCSP, VoVGSCSPC):
+                     VoVGSCSP, VoVGSCSPC, C2f_CloAtt, C3_CloAtt):
                 args.insert(2, n)  # number of repeats
                 n = 1
         elif m is AIFI:
@@ -701,13 +705,19 @@ def parse_model(d, ch, verbose=True):  # model_dict, input_channels(3)
             c2 = m.feature_info.channels()
         elif m in {convnextv2_atto, convnextv2_femto, convnextv2_pico, convnextv2_nano, convnextv2_tiny, convnextv2_base, convnextv2_large, convnextv2_huge,
                    fasternet_t0, fasternet_t1, fasternet_t2, fasternet_s, fasternet_m, fasternet_l,
-                   efficientvit_b0, efficientvit_b1, efficientvit_b2, efficientvit_b3,
-                   efficientformerv2_s0, efficientformerv2_s1, efficientformerv2_s2, efficientformerv2_l
+                   EfficientViT_M0, EfficientViT_M1, EfficientViT_M2, EfficientViT_M3, EfficientViT_M4, EfficientViT_M5,
+                   efficientformerv2_s0, efficientformerv2_s1, efficientformerv2_s2, efficientformerv2_l,
+                   vanillanet_5, vanillanet_6, vanillanet_7, vanillanet_8, vanillanet_9, vanillanet_10, vanillanet_11, vanillanet_12, vanillanet_13, vanillanet_13_x1_5, vanillanet_13_x1_5_ada_pool,
+                   RevCol,
+                   lsknet_t, lsknet_t
                    }:
+            if m is RevCol:
+                args[1] = [make_divisible(min(k, max_channels) * width, 8) for k in args[1]]
+                args[2] = [max(round(k * depth), 1) for k in args[2]]
             m = m(*args)
             c2 = m.channel
         elif m in {EMA, SpatialAttention, BiLevelRoutingAttention, BiLevelRoutingAttention_nchw,
-                   TripletAttention, CoordAtt, CBAM, BAMBlock}:
+                   TripletAttention, CoordAtt, CBAM, BAMBlock, LSKBlock}:
             c2 = ch[f]
             args = [c2, *args]
             # print(args)
