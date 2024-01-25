@@ -35,7 +35,7 @@ def parse_opt():
     parser.add_argument('--epochs', type=int, default=100, help='number of epochs to train for')
     parser.add_argument('--patience', type=int, default=100, help='EarlyStopping patience (epochs without improvement)')
     parser.add_argument('--unamp', action='store_true', help='Unuse Automatic Mixed Precision (AMP) training')
-    parser.add_argument('--batch', type=int, default=16, help='number of images per batch (-1 for AutoBatch)')
+    parser.add_argument('--batch', type=int, default=128, help='number of images per batch (-1 for AutoBatch)')
     parser.add_argument('--imgsz', type=int, default=640, help='size of input images as integer')
     parser.add_argument('--cache', type=str, nargs='?', const='ram', help='image --cache ram/disk')
     parser.add_argument('--device', type=str, default='', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
@@ -43,7 +43,7 @@ def parse_opt():
     parser.add_argument('--project', type=str, default=ROOT / 'runs/train', help='save to project/name')
     parser.add_argument('--name', type=str, default='exp', help='save to project/name')
     parser.add_argument('--resume', type=str, default='', help='resume training from last checkpoint')
-    parser.add_argument('--optimizer', type=str, choices=['SGD', 'Adam', 'Adamax', 'NAdam', 'RAdam', 'AdamW', 'RMSProp', 'auto'], default='SGD', help='optimizer (auto -> ultralytics/yolo/engine/trainer.py in build_optimizer funciton.)')
+    parser.add_argument('--optimizer', type=str, choices=['SGD', 'Adam', 'Adamax', 'NAdam', 'RAdam', 'AdamW', 'RMSProp', 'auto'], default='auto', help='optimizer (auto -> ultralytics/yolo/engine/trainer.py in build_optimizer funciton.)')
     parser.add_argument('--close_mosaic', type=int, default=0, help='(int) disable mosaic augmentation for final epochs')
     parser.add_argument('--info', action="store_true", help='model info verbose')
     
